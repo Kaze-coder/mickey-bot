@@ -9,7 +9,7 @@ const client = new Client({
     ] 
 });
 
-const TOKEN = process.env.TOKEN
+const TOKEN = process.env.TOKEN;
 
 client.once('ready', () => {
     console.log(`✅ ${client.user.tag} udah online!`);
@@ -340,11 +340,11 @@ client.on('interactionCreate', async (interaction) => {
         if (addedRoles.length > 0) {
             const addedText = addedRoles.map(roleName => {
                 const role = interaction.guild.roles.cache.find(r => r.name === roleName);
-                return `✅ ${role ? `<@&${role.id}>` : `@${roleName}`}`;
+                return `${role ? `<@&${role.id}>` : `@${roleName}`}`;
             }).join('\n');
             
             responseEmbed.addFields({
-                name: '📥 Added Roles',
+                name: '✅ Added Roles',
                 value: addedText,
                 inline: false
             });
@@ -353,11 +353,11 @@ client.on('interactionCreate', async (interaction) => {
         if (removedRoles.length > 0) {
             const removedText = removedRoles.map(roleName => {
                 const role = interaction.guild.roles.cache.find(r => r.name === roleName);
-                return `❌ ${role ? `<@&${role.id}>` : `@${roleName}`}`;
+                return `${role ? `<@&${role.id}>` : `@${roleName}`}`;
             }).join('\n');
             
             responseEmbed.addFields({
-                name: '📤 Removed Roles',
+                name: '❌ Removed Roles',
                 value: removedText,
                 inline: false
             });
@@ -371,10 +371,15 @@ client.on('interactionCreate', async (interaction) => {
             responseEmbed.setColor('#00D9FF');
         }
 
-        await interaction.reply({ 
+        const msg = await interaction.reply({ 
             embeds: [responseEmbed], 
             ephemeral: true 
         });
+
+        // Auto-delete message setelah 5 detik
+        setTimeout(() => {
+            msg.delete().catch(() => {});
+        }, 3000);
     } catch (error) {
         console.error('Error handling role selection:', error);
         
@@ -384,10 +389,15 @@ client.on('interactionCreate', async (interaction) => {
             .setDescription('Ada error pas update roles. Pastikan bot punya permission yang cukup!')
             .setTimestamp();
         
-        await interaction.reply({ 
+        const msg = await interaction.reply({ 
             embeds: [errorEmbed], 
             ephemeral: true 
         });
+
+        // Auto-delete message setelah 5 detik
+        setTimeout(() => {
+            msg.delete().catch(() => {});
+        }, 3000);
     }
 });
 
