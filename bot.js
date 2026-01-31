@@ -719,7 +719,7 @@ client.on('interactionCreate', async (interaction) => {
                 const row2 = new ActionRowBuilder().addComponents(descriptionInput);
                 const row3 = new ActionRowBuilder().addComponents(colorInput);
                 const row4 = new ActionRowBuilder().addComponents(imageInput);
-                const row5 = new ActionRowBuilder().addComponents(thumbnailInput);
+                const row5 = new ActionRowBuilder().addComponents(footerInput);
 
                 modal.addComponents(row1, row2, row3, row4, row5);
 
@@ -743,8 +743,14 @@ client.on('interactionCreate', async (interaction) => {
                 const description = interaction.fields.getTextInputValue('embed_description');
                 const color = interaction.fields.getTextInputValue('embed_color') || '#808080';
                 const imageUrl = interaction.fields.getTextInputValue('embed_image');
-                const thumbnailUrl = interaction.fields.getTextInputValue('embed_thumbnail');
-                const footerText = interaction.fields.getTextInputValue('embed_footer');
+                
+                // Use catch untuk optional fields
+                let footerText = '';
+                try {
+                    footerText = interaction.fields.getTextInputValue('embed_footer');
+                } catch (e) {
+                    footerText = '';
+                }
 
                 // Create the embed
                 const embed = new EmbedBuilder()
@@ -760,7 +766,6 @@ client.on('interactionCreate', async (interaction) => {
                     }
                 }
                 if (imageUrl) embed.setImage(imageUrl);
-                if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
                 if (footerText) {
                     embed.setFooter({ text: footerText });
                 } else {
