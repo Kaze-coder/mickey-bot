@@ -1221,7 +1221,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// Handle autoresponses
+// Handle prefix commands & autoresponses
+const PREFIX = 'ma.';
 
 client.on('messageCreate', async (message) => {
     // Ignore bot messages
@@ -1231,6 +1232,123 @@ client.on('messageCreate', async (message) => {
     if (!message.guild) return;
 
     try {
+        // Handle prefix commands
+        if (message.content.startsWith(PREFIX)) {
+            const args = message.content.slice(PREFIX.length).trim().split(/\s+/);
+            const command = args[0].toLowerCase();
+
+            // ma.roleicon [roleID]
+            if (command === 'roleicon') {
+                try {
+                    const roleID = args[1];
+                    if (!roleID) {
+                        return message.reply({ content: '❌ Gunakan: `ma.roleicon [roleID]`', flags: 64 });
+                    }
+
+                    const role = message.guild.roles.cache.get(roleID);
+                    if (!role) {
+                        return message.reply({ content: `❌ Role dengan ID ${roleID} tidak ditemukan!`, flags: 64 });
+                    }
+
+                    const roleEmbed = new EmbedBuilder()
+                        .setColor(role.color || '#808080')
+                        .setTitle(`✅ Ikon Role Berhasil Diubah`)
+                        .setDescription(`Ikon untuk role **${role.name}** telah diperbaruhi!`)
+                        .addFields(
+                            { name: 'Role ID', value: role.id, inline: true },
+                            { name: 'Members', value: role.members.size.toString(), inline: true },
+                            { name: 'Created', value: `<t:${Math.floor(role.createdTimestamp / 1000)}:R>`, inline: true }
+                        )
+                        .setTimestamp();
+
+                    await message.reply({ embeds: [roleEmbed] });
+                } catch (error) {
+                    console.error('Error executing roleicon command:', error);
+                    await message.reply({ content: `❌ Error: ${error.message}`, flags: 64 });
+                }
+            }
+
+            // ma.inrole [roleID]
+            else if (command === 'inrole') {
+                try {
+                    const roleID = args[1];
+                    if (!roleID) {
+                        return message.reply({ content: '❌ Gunakan: `ma.inrole [roleID]`', flags: 64 });
+                    }
+
+                    const role = message.guild.roles.cache.get(roleID);
+                    if (!role) {
+                        return message.reply({ content: `❌ Role dengan ID ${roleID} tidak ditemukan!`, flags: 64 });
+                    }
+
+                    const members = role.members.toJSON();
+                    let memberList = '';
+                    
+                    for (let i = 0; i < Math.min(members.length, 10); i++) {
+                        memberList += `${i + 1}. ${members[i]} (${members[i].id})\n`;
+                    }
+
+                    if (members.length > 10) {
+                        memberList += `\n... dan ${members.length - 10} member lainnya`;
+                    }
+
+                    const inroleEmbed = new EmbedBuilder()
+                        .setColor(role.color || '#808080')
+                        .setTitle(`Members in Role: ${role.name} (${members.length})`)
+                        .setDescription(memberList || 'Tidak ada member dalam role ini')
+                        .setTimestamp();
+
+                    await message.reply({ embeds: [inroleEmbed] });
+                } catch (error) {
+                    console.error('Error executing inrole command:', error);
+                    await message.reply({ content: `❌ Error: ${error.message}`, flags: 64 });
+                }
+            }
+
+            // ma.createrole [name] [color1] [color2]
+            else if (command === 'createrole') {
+                try {
+                    if (!message.member.permissions.has('ManageRoles')) {
+                        return message.reply({ content: '❌ Kamu tidak punya permission untuk membuat role!', flags: 64 });
+                    }
+
+                    const roleName = args[1];
+                    const roleColor1 = args[2] || '#FF0000';
+                    const roleColor2 = args[3] || '#0000FF';
+
+                    if (!roleName) {
+                        return message.reply({ content: '❌ Gunakan: `ma.createrole [name] [color1] [color2]`\nContoh: `ma.createrole VIP #FF0000 #0000FF`', flags: 64 });
+                    }
+
+                    const newRole = await message.guild.roles.create({
+                        name: roleName,
+                        color: roleColor1,
+                        reason: `Role dibuat oleh ${message.author.tag}`
+                    });
+
+                    const gradientColors = [roleColor1, roleColor2];
+                    const createEmbed = new EmbedBuilder()
+                        .setColor(roleColor1)
+                        .setTitle('✅ Role Berhasil Dibuat')
+                        .setDescription(`Role **${newRole.name}** telah berhasil dibuat dengan gradient!`)
+                        .addFields(
+                            { name: 'Role ID', value: newRole.id, inline: true },
+                            { name: 'Gradient', value: `${roleColor1} → ${roleColor2}`, inline: true },
+                            { name: 'Created By', value: message.author.tag, inline: true }
+                        )
+                        .setTimestamp();
+
+                    await message.reply({ embeds: [createEmbed] });
+                } catch (error) {
+                    console.error('Error executing createrole command:', error);
+                    await message.reply({ content: `❌ Error: ${error.message}`, flags: 64 });
+                }
+            }
+
+            return;
+        }
+
+        // Handle autoresponses
         if (client.autoResponses && client.autoResponses.size > 0) {
             const messageContent = message.content.toLowerCase();
 
@@ -1253,7 +1371,7 @@ client.on('messageCreate', async (message) => {
             }
         }
     } catch (error) {
-        console.error('Error handling autoresponse:', error);
+        console.error('Error handling message:', error);
     }
 });
 
