@@ -12,6 +12,23 @@ const client = new Client({
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 
+// Helper function untuk parse duration (e.g., "1h", "30m", "7d")
+function parseDuration(durationStr) {
+    const match = durationStr.match(/^(\d+)([smhd])$/);
+    if (!match) return null;
+
+    const amount = parseInt(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+        case 's': return amount * 1000;
+        case 'm': return amount * 60 * 1000;
+        case 'h': return amount * 60 * 60 * 1000;
+        case 'd': return amount * 24 * 60 * 60 * 1000;
+        default: return null;
+    }
+}
+
 // Register slash commands
 const commands = [
     new SlashCommandBuilder()
@@ -183,13 +200,53 @@ const commands = [
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder()
-        .setName('setup-modlog')
-        .setDescription('Setup moderation log channel (Admin only)')
+        .setName('setup-logs')
+        .setDescription('Setup moderation logs channel (Admin only)')
         .addChannelOption(option =>
             option.setName('channel')
                 .setDescription('Channel for mod logs')
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('timeout')
+        .setDescription('Timeout a user for temporary duration (Admin only)')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to timeout')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('duration')
+                .setDescription('Duration (e.g., 1h, 30m, 7d)')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('reason')
+                .setDescription('Reason for timeout')
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    new SlashCommandBuilder()
+        .setName('mute')
+        .setDescription('Mute a user permanently (Admin only)')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to mute')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('reason')
+                .setDescription('Reason for mute')
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    new SlashCommandBuilder()
+        .setName('unmute')
+        .setDescription('Remove mute from a user (Admin only)')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to remove mute')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('reason')
+                .setDescription('Reason for unmute')
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -615,14 +672,14 @@ client.on('interactionCreate', async (interaction) => {
 
                 await interaction.reply({ embeds: [banEmbed], flags: 64 });
 
-                // Send to modlog channel
-                const modlogChannelId = client.modlogConfig?.[interaction.guildId];
-                if (modlogChannelId) {
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
                     try {
-                        const modlogChannel = await interaction.guild.channels.fetch(modlogChannelId);
-                        if (modlogChannel) {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
                             const logMessage = `${user.tag} has been banned from ${interaction.guild.name}!${reason !== 'No reason provided' ? `\nReason: ${reason}` : ''}`;
-                            await modlogChannel.send(logMessage);
+                            await logsChannel.send(logMessage);
                         }
                     } catch (error) {
                         console.error('Error sending ban log:', error);
@@ -675,14 +732,14 @@ client.on('interactionCreate', async (interaction) => {
 
                 await interaction.reply({ embeds: [kickEmbed], flags: 64 });
 
-                // Send to modlog channel
-                const modlogChannelId = client.modlogConfig?.[interaction.guildId];
-                if (modlogChannelId) {
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
                     try {
-                        const modlogChannel = await interaction.guild.channels.fetch(modlogChannelId);
-                        if (modlogChannel) {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
                             const logMessage = `${user.tag} has been kicked from ${interaction.guild.name}!${reason !== 'No reason provided' ? `\nReason: ${reason}` : ''}`;
-                            await modlogChannel.send(logMessage);
+                            await logsChannel.send(logMessage);
                         }
                     } catch (error) {
                         console.error('Error sending kick log:', error);
@@ -727,14 +784,14 @@ client.on('interactionCreate', async (interaction) => {
 
                 await interaction.reply({ embeds: [unbanEmbed], flags: 64 });
 
-                // Send to modlog channel
-                const modlogChannelId = client.modlogConfig?.[interaction.guildId];
-                if (modlogChannelId) {
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
                     try {
-                        const modlogChannel = await interaction.guild.channels.fetch(modlogChannelId);
-                        if (modlogChannel) {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
                             const logMessage = `User <@${userId}> (${userId}) has been unbanned from ${interaction.guild.name}!${reason !== 'No reason provided' ? `\nReason: ${reason}` : ''}`;
-                            await modlogChannel.send(logMessage);
+                            await logsChannel.send(logMessage);
                         }
                     } catch (error) {
                         console.error('Error sending unban log:', error);
@@ -980,32 +1037,217 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        if (commandName === 'setup-modlog') {
+        if (commandName === 'setup-logs') {
             try {
                 const channel = interaction.options.getChannel('channel');
 
                 // Initialize config jika belum ada
-                if (!client.modlogConfig) {
-                    client.modlogConfig = {};
+                if (!client.logsConfig) {
+                    client.logsConfig = {};
                 }
 
-                // Set modlog channel untuk guild ini
-                client.modlogConfig[interaction.guildId] = channel.id;
+                // Set logs channel untuk guild ini
+                client.logsConfig[interaction.guildId] = channel.id;
 
                 const setupEmbed = new EmbedBuilder()
                     .setColor('#00FF00')
-                    .setTitle('✅ Moderation Log Channel Setup')
+                    .setTitle('✅ Moderation Logs Channel Setup')
                     .addFields({
                         name: 'Channel',
                         value: `${channel}`,
                         inline: false
                     })
-                    .setDescription('Bot akan log semua moderation actions di channel ini')
+                    .setDescription('Bot akan log semua moderation actions di channel ini (ban, kick, timeout, mute, dll)')
                     .setTimestamp();
 
                 await interaction.reply({ embeds: [setupEmbed], flags: 64 });
             } catch (error) {
-                console.error('Error setting up modlog channel:', error);
+                console.error('Error setting up logs channel:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'timeout') {
+            try {
+                const user = interaction.options.getUser('user');
+                const duration = interaction.options.getString('duration');
+                const reason = interaction.options.getString('reason') || 'No reason provided';
+                const member = interaction.guild.members.cache.get(user.id);
+
+                // Check if user exists
+                if (!member) {
+                    return await interaction.reply({
+                        content: '❌ User not found in this server!',
+                        flags: 64
+                    });
+                }
+
+                // Parse duration
+                const durationMs = parseDuration(duration);
+                if (!durationMs) {
+                    return await interaction.reply({
+                        content: '❌ Invalid duration format! Use: 1h, 30m, 7d, etc.',
+                        flags: 64
+                    });
+                }
+
+                // Check if duration is valid (max 28 days)
+                if (durationMs > 28 * 24 * 60 * 60 * 1000) {
+                    return await interaction.reply({
+                        content: '❌ Timeout duration cannot exceed 28 days!',
+                        flags: 64
+                    });
+                }
+
+                // Timeout the member
+                await member.timeout(durationMs, reason);
+
+                const timeoutEmbed = new EmbedBuilder()
+                    .setColor('#FFAA00')
+                    .setTitle('⏱️ User Timed Out')
+                    .addFields(
+                        { name: 'User', value: `${user.tag} (${user.id})`, inline: true },
+                        { name: 'Duration', value: duration, inline: true },
+                        { name: 'Reason', value: reason, inline: true },
+                        { name: 'Timed out by', value: interaction.user.tag, inline: true }
+                    )
+                    .setThumbnail(user.displayAvatarURL())
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [timeoutEmbed], flags: 64 });
+
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
+                    try {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
+                            const logMessage = `${user.tag} has been timed out for ${duration} from ${interaction.guild.name}!\nReason: ${reason}`;
+                            await logsChannel.send(logMessage);
+                        }
+                    } catch (error) {
+                        console.error('Error sending timeout log:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error timing out user:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'unmute') {
+            try {
+                const user = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason') || 'No reason provided';
+                const member = interaction.guild.members.cache.get(user.id);
+
+                // Check if user exists
+                if (!member) {
+                    return await interaction.reply({
+                        content: '❌ User not found in this server!',
+                        flags: 64
+                    });
+                }
+
+                // Check if user is timed out
+                if (!member.communicationDisabledUntil) {
+                    return await interaction.reply({
+                        content: '❌ User is not timed out!',
+                        flags: 64
+                    });
+                }
+
+                // Remove timeout
+                await member.timeout(null, reason);
+
+                const unmuteEmbed = new EmbedBuilder()
+                    .setColor('#00FF00')
+                    .setTitle('✅ User Unmuted')
+                    .addFields(
+                        { name: 'User', value: `${user.tag} (${user.id})`, inline: true },
+                        { name: 'Reason', value: reason, inline: true },
+                        { name: 'Unmuted by', value: interaction.user.tag, inline: true }
+                    )
+                    .setThumbnail(user.displayAvatarURL())
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [unmuteEmbed], flags: 64 });
+
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
+                    try {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
+                            const logMessage = `${user.tag} has been unmuted from ${interaction.guild.name}!\nReason: ${reason}`;
+                            await logsChannel.send(logMessage);
+                        }
+                    } catch (error) {
+                        console.error('Error sending unmute log:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error unmuting user:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'mute') {
+            try {
+                const user = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason') || 'No reason provided';
+                const member = interaction.guild.members.cache.get(user.id);
+
+                // Check if user exists
+                if (!member) {
+                    return await interaction.reply({
+                        content: '❌ User not found in this server!',
+                        flags: 64
+                    });
+                }
+
+                // Mute the member (28 days = max permanent until manual unmute)
+                const permanentMuteDuration = 28 * 24 * 60 * 60 * 1000;
+                await member.timeout(permanentMuteDuration, reason);
+
+                const muteEmbed = new EmbedBuilder()
+                    .setColor('#FF00FF')
+                    .setTitle('🔇 User Muted (Permanent)')
+                    .addFields(
+                        { name: 'User', value: `${user.tag} (${user.id})`, inline: true },
+                        { name: 'Reason', value: reason, inline: true },
+                        { name: 'Muted by', value: interaction.user.tag, inline: true },
+                        { name: 'Type', value: 'Permanent (until unmuted)', inline: true }
+                    )
+                    .setThumbnail(user.displayAvatarURL())
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [muteEmbed], flags: 64 });
+
+                // Send to logs channel
+                const logsChannelId = client.logsConfig?.[interaction.guildId];
+                if (logsChannelId) {
+                    try {
+                        const logsChannel = await interaction.guild.channels.fetch(logsChannelId);
+                        if (logsChannel) {
+                            const logMessage = `${user.tag} has been muted (permanent) from ${interaction.guild.name}!\nReason: ${reason}`;
+                            await logsChannel.send(logMessage);
+                        }
+                    } catch (error) {
+                        console.error('Error sending mute log:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error muting user:', error);
                 await interaction.reply({
                     content: `❌ Error: ${error.message}`,
                     flags: 64
