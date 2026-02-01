@@ -1831,6 +1831,31 @@ client.on('messageCreate', async (message) => {
                 }
             }
 
+            // ma.meme - Random meme
+            else if (command === 'meme') {
+                try {
+                    const response = await fetch('https://meme-api.herokuapp.com/gimme');
+                    const data = await response.json();
+
+                    if (data.nsfw) {
+                        return await message.reply({ content: '❌ NSFW content filtered! Coba lagi.', flags: 64 });
+                    }
+
+                    const memeEmbed = new EmbedBuilder()
+                        .setTitle(data.title)
+                        .setImage(data.url)
+                        .setURL(data.postLink)
+                        .setFooter({ text: `r/${data.subreddit}` })
+                        .setColor('#808080')
+                        .setTimestamp();
+
+                    await message.reply({ embeds: [memeEmbed] });
+                } catch (error) {
+                    console.error('Error fetching meme:', error);
+                    await message.reply({ content: '❌ Error fetching meme! API sedang down mungkin.', flags: 64 });
+                }
+            }
+
             // ma.list - Show all prefix commands
             else if (command === 'list') {
                 try {
@@ -1852,6 +1877,11 @@ client.on('messageCreate', async (message) => {
                             { 
                                 name: 'ma.createrole [name] [color1] [color2]', 
                                 value: 'Buat role baru dengan gradient\nContoh: `ma.createrole VIP #FF0000 #0000FF`\nPerlu: ManageRoles permission', 
+                                inline: false 
+                            },
+                            { 
+                                name: 'ma.meme', 
+                                value: 'Kirim random meme dari internet 😂\nContoh: `ma.meme`', 
                                 inline: false 
                             },
                             { 
