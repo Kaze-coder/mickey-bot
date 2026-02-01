@@ -1237,17 +1237,31 @@ client.on('messageCreate', async (message) => {
             const args = message.content.slice(PREFIX.length).trim().split(/\s+/);
             const command = args[0].toLowerCase();
 
-            // ma.roleicon [roleID]
+            // ma.roleicon [roleID/mention/name]
             if (command === 'roleicon') {
                 try {
-                    const roleID = args[1];
-                    if (!roleID) {
-                        return message.reply({ content: '❌ Gunakan: `ma.roleicon [roleID]`', flags: 64 });
+                    const roleInput = args.slice(1).join(' ');
+                    if (!roleInput) {
+                        return message.reply({ content: '❌ Gunakan: `ma.roleicon [roleID/mention/nama]`\nContoh: `ma.roleicon 123456` atau `ma.roleicon @VIP` atau `ma.roleicon VIP`', flags: 64 });
                     }
 
-                    const role = message.guild.roles.cache.get(roleID);
+                    let role;
+                    // Check jika role ID
+                    if (/^\d+$/.test(roleInput)) {
+                        role = message.guild.roles.cache.get(roleInput);
+                    } 
+                    // Check jika mention role <@&id>
+                    else if (roleInput.match(/^<@&(\d+)>$/)) {
+                        const roleId = roleInput.match(/^<@&(\d+)>$/)[1];
+                        role = message.guild.roles.cache.get(roleId);
+                    }
+                    // Check by name
+                    else {
+                        role = message.guild.roles.cache.find(r => r.name.toLowerCase() === roleInput.toLowerCase());
+                    }
+
                     if (!role) {
-                        return message.reply({ content: `❌ Role dengan ID ${roleID} tidak ditemukan!`, flags: 64 });
+                        return message.reply({ content: `❌ Role "${roleInput}" tidak ditemukan!`, flags: 64 });
                     }
 
                     const roleEmbed = new EmbedBuilder()
@@ -1268,24 +1282,38 @@ client.on('messageCreate', async (message) => {
                 }
             }
 
-            // ma.inrole [roleID]
+            // ma.inrole [roleID/mention/name]
             else if (command === 'inrole') {
                 try {
-                    const roleID = args[1];
-                    if (!roleID) {
-                        return message.reply({ content: '❌ Gunakan: `ma.inrole [roleID]`', flags: 64 });
+                    const roleInput = args.slice(1).join(' ');
+                    if (!roleInput) {
+                        return message.reply({ content: '❌ Gunakan: `ma.inrole [roleID/mention/nama]`\nContoh: `ma.inrole 123456` atau `ma.inrole @VIP` atau `ma.inrole VIP`', flags: 64 });
                     }
 
-                    const role = message.guild.roles.cache.get(roleID);
+                    let role;
+                    // Check jika role ID
+                    if (/^\d+$/.test(roleInput)) {
+                        role = message.guild.roles.cache.get(roleInput);
+                    }
+                    // Check jika mention role <@&id>
+                    else if (roleInput.match(/^<@&(\d+)>$/)) {
+                        const roleId = roleInput.match(/^<@&(\d+)>$/)[1];
+                        role = message.guild.roles.cache.get(roleId);
+                    }
+                    // Check by name
+                    else {
+                        role = message.guild.roles.cache.find(r => r.name.toLowerCase() === roleInput.toLowerCase());
+                    }
+
                     if (!role) {
-                        return message.reply({ content: `❌ Role dengan ID ${roleID} tidak ditemukan!`, flags: 64 });
+                        return message.reply({ content: `❌ Role "${roleInput}" tidak ditemukan!`, flags: 64 });
                     }
 
                     const members = role.members.toJSON();
                     let memberList = '';
                     
                     for (let i = 0; i < Math.min(members.length, 10); i++) {
-                        memberList += `${i + 1}. ${members[i]} (${members[i].id})\n`;
+                        memberList += `${i + 1}. ${members[i].user.username}\n`;
                     }
 
                     if (members.length > 10) {
@@ -1349,18 +1377,18 @@ client.on('messageCreate', async (message) => {
             else if (command === 'list') {
                 try {
                     const listEmbed = new EmbedBuilder()
-                        .setColor('#00D9FF')
-                        .setTitle('📋 Daftar Prefix Commands')
+                        .setColor('#808080')
+                        .setTitle('Daftar Prefix Commands')
                         .setDescription('Semua available prefix commands:')
                         .addFields(
                             { 
-                                name: 'ma.roleicon [roleID]', 
-                                value: 'Tampilkan info role (ID, member count, created date)', 
+                                name: 'ma.roleicon [ID/mention/nama]', 
+                                value: 'Tampilkan info role dengan berbagai cara input\nContoh: `ma.roleicon @VIP` atau `ma.roleicon VIP`', 
                                 inline: false 
                             },
                             { 
-                                name: 'ma.inrole [roleID]', 
-                                value: 'Tampilkan list members dalam role (max 10)', 
+                                name: 'ma.inrole [ID/mention/nama]', 
+                                value: 'Tampilkan list members dalam role (max 10)\nContoh: `ma.inrole @VIP` atau `ma.inrole VIP`', 
                                 inline: false 
                             },
                             { 
@@ -1374,8 +1402,7 @@ client.on('messageCreate', async (message) => {
                                 inline: false 
                             }
                         )
-                        .setFooter({ text: 'Gunakan ma.[command] untuk menjalankan command' })
-                        .setTimestamp();
+                        .setFooter({ text: 'Gunakan ma.[command] untuk menjalankan command' });
 
                     await message.reply({ embeds: [listEmbed] });
                 } catch (error) {
