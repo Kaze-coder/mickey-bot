@@ -1,7 +1,6 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const axios = require('axios');
-const { translate } = require('@vitalets/google-translate-api');
 require('dotenv').config();
 
 const client = new Client({ 
@@ -2048,73 +2047,6 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
-        // Handle auto-translate in international-chat channel
-        try {
-            const INTERNATIONAL_CHAT_CHANNEL_ID = '1451535027820036127';
-            
-            if (message.channelId === INTERNATIONAL_CHAT_CHANNEL_ID && !message.author.bot) {
-                console.log(`[AUTO-TRANSLATE] Detected message in international-class: "${message.content.substring(0, 50)}..."`);
-                
-                const messageText = message.content;
-                
-                if (messageText.trim().length === 0) return;
-
-                try {
-                    console.log('[AUTO-TRANSLATE] Starting translation...');
-                    // Translate text to English (auto-detect source language)
-                    const result = await translate(messageText, { to: 'en' });
-                    const translatedText = result.text;
-                    
-                    console.log('[AUTO-TRANSLATE] Translation result:', { translatedText, from: result.from });
-                    
-                    // Safe extraction of detected language
-                    const detectedLanguage = result?.from?.language?.iso || result?.from?.language || 'unknown';
-                    console.log('[AUTO-TRANSLATE] Detected language:', detectedLanguage);
-
-                    // Jika sudah English atau language unknown, skip
-                    if (detectedLanguage === 'en' || detectedLanguage === 'unknown') {
-                        console.log('[AUTO-TRANSLATE] Language is English or unknown, skipping translation');
-                        return;
-                    }
-
-                    // Format: Original + Translation
-                    const translateEmbed = new EmbedBuilder()
-                        .setColor('#00D9FF')
-                        .setAuthor({ 
-                            name: `Translation (${detectedLanguage.toUpperCase()} → EN)`,
-                            iconURL: message.author.displayAvatarURL() 
-                        })
-                        .addFields(
-                            { 
-                                name: '📝 Original', 
-                                value: `\`\`\`\n${messageText}\n\`\`\``, 
-                                inline: false 
-                            },
-                            { 
-                                name: '🌐 English', 
-                                value: `\`\`\`\n${translatedText}\n\`\`\``, 
-                                inline: false 
-                            }
-                        )
-                        .setFooter({ text: `Requested by ${message.author.username}` })
-                        .setTimestamp();
-
-                    console.log('[AUTO-TRANSLATE] Sending translation embed...');
-                    await message.reply({ 
-                        embeds: [translateEmbed],
-                        allowedMentions: { repliedUser: false }
-                    }).catch((err) => {
-                        console.error('[AUTO-TRANSLATE] Error sending reply:', err);
-                    });
-
-                } catch (translateError) {
-                    console.error('[AUTO-TRANSLATE] Error translating message:', translateError);
-                    // Silently fail jangan spam error
-                }
-            }
-        } catch (error) {
-            console.error('Error in auto-translate logic:', error);
-        }
 
         // Handle autoresponses
         if (client.autoResponses && client.autoResponses.size > 0) {
