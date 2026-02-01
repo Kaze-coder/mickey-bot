@@ -2061,38 +2061,41 @@ client.on('messageCreate', async (message) => {
                     // Translate text to English (auto-detect source language)
                     const result = await translate(messageText, { to: 'en' });
                     const translatedText = result.text;
-                    const detectedLanguage = result.from.language.iso || 'unknown';
+                    
+                    // Safe extraction of detected language
+                    const detectedLanguage = result?.from?.language?.iso || result?.from?.language || 'unknown';
 
-                    // Jika bukan English, reply dengan translation
-                    if (detectedLanguage !== 'en') {
-                        // Format: Original + Translation
-                        const translateEmbed = new EmbedBuilder()
-                            .setColor('#00D9FF')
-                            .setAuthor({ 
-                                name: `Translation (${detectedLanguage.toUpperCase()} → EN)`,
-                                iconURL: message.author.displayAvatarURL() 
-                            })
-                            .addFields(
-                                { 
-                                    name: '📝 Original', 
-                                    value: `\`\`\`\n${messageText}\n\`\`\``, 
-                                    inline: false 
-                                },
-                                { 
-                                    name: '🌐 English', 
-                                    value: `\`\`\`\n${translatedText}\n\`\`\``, 
-                                    inline: false 
-                                }
-                            )
-                            .setFooter({ text: `Requested by ${message.author.username}` })
-                            .setTimestamp();
-
-                        await message.reply({ 
-                            embeds: [translateEmbed],
-                            allowedMentions: { repliedUser: false }
-                        }).catch(() => {});
+                    // Jika sudah English atau language unknown, skip
+                    if (detectedLanguage === 'en' || detectedLanguage === 'unknown') {
+                        return;
                     }
-                    // Jika sudah English, ignore (tidak reply)
+
+                    // Format: Original + Translation
+                    const translateEmbed = new EmbedBuilder()
+                        .setColor('#00D9FF')
+                        .setAuthor({ 
+                            name: `Translation (${detectedLanguage.toUpperCase()} → EN)`,
+                            iconURL: message.author.displayAvatarURL() 
+                        })
+                        .addFields(
+                            { 
+                                name: '📝 Original', 
+                                value: `\`\`\`\n${messageText}\n\`\`\``, 
+                                inline: false 
+                            },
+                            { 
+                                name: '🌐 English', 
+                                value: `\`\`\`\n${translatedText}\n\`\`\``, 
+                                inline: false 
+                            }
+                        )
+                        .setFooter({ text: `Requested by ${message.author.username}` })
+                        .setTimestamp();
+
+                    await message.reply({ 
+                        embeds: [translateEmbed],
+                        allowedMentions: { repliedUser: false }
+                    }).catch(() => {});
 
                 } catch (translateError) {
                     console.error('Error translating message:', translateError);
